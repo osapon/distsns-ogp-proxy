@@ -7,3 +7,7 @@ Even if this site disappears, the original URL information is maintained, unlike
 このサイトは、分散型SNSにリンクを投稿する際に、リンク先の情報を取得するアクセスで相手のサイトに負担をかけないようにするためのプロキシです。
 Mastodon、Misskey、Pleromaのユーザーエージェントでアクセスをすると、10分間はキャッシュの内容を返答し、その他のブラウザでアクセスした場合は、リンク先にリダイレクトされます。
 もしこのサイトが無くなっても、短縮URLと異なり元のURL情報を維持するので、リンク先への辿り着くことが可能です。
+
+![no proxy](ogpproxy1.png)
+
+![use proxy](ogpproxy2.png)
