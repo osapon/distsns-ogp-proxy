@@ -11,12 +11,42 @@ import (
 	"net/url"
 	"html/template"
 	"strings"
-
+	"os"
 	"golang.org/x/net/html"
 	"github.com/go-shiori/dom"
 	"github.com/bradfitz/gomemcache/memcache"
 	"crypto/md5"
+	service "github.com/kardianos/service"
 )
+
+type exarvice struct {
+	exit chan struct{}
+}
+
+var loggerOs service.Logger
+
+func (e *exarvice) run() {
+	l, _ := net.Listen("tcp", "127.0.0.1:8080")
+	http.HandleFunc("/", handler)
+	fcgi.Serve(l, nil)
+}
+
+func (e *exarvice) Start(s service.Service) error {
+	if service.Interactive() {
+		loggerOs.Info("Running in terminal.")
+	} else {
+		loggerOs.Info("Running under service manager.")
+	}
+	e.exit = make(chan struct{})
+
+	go e.run()
+	return nil
+}
+
+func (e *exarvice) Stop(s service.Service) error {
+	close(e.exit)
+	return nil
+}
 
 func handler(writer http.ResponseWriter, serverRequest *http.Request) {
 	if serverRequest.URL.Path == "/" {
@@ -30,7 +60,11 @@ func handler(writer http.ResponseWriter, serverRequest *http.Request) {
 		}
 		return
 	}
+	
 	proxyUrl := serverRequest.URL.Scheme + ":/" + serverRequest.URL.Path
+	if serverRequest.URL.RawQuery != "" {
+		proxyUrl = proxyUrl + "?" + serverRequest.URL.RawQuery
+	}
 
 	if strings.Contains(serverRequest.Header.Get("User-Agent"), "(Mastodon/") ||
 		strings.Contains(serverRequest.Header.Get("User-Agent"), "Misskey/") ||
@@ -118,7 +152,36 @@ func replaceTagUrl(url *url.URL, doc *html.Node, tagName string) {
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds | log.Lshortfile)
 
-	l, _ := net.Listen("tcp", "127.0.0.1:8080")
-	http.HandleFunc("/", handler)
-	fcgi.Serve(l, nil)
+	svcConfig := &service.Config{
+		Name:        "ogpproxy",
+		DisplayName: "OGP Proxy",
+		Description: "",
+	}
+
+	// Create Exarvice service
+	program := &exarvice{}
+	s, err := service.New(program, svcConfig)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Setup the logger
+	errs := make(chan error, 5)
+	loggerOs, err = s.Logger(errs)
+	if err != nil {
+		log.Fatal()
+	}
+
+	if len(os.Args) > 1 {
+
+		err = service.Control(s, os.Args[1])
+		if err != nil {
+			fmt.Printf("Failed (%s) : %s\n", os.Args[1], err)
+			return
+		}
+		fmt.Printf("Succeeded (%s)\n", os.Args[1])
+		return
+	}
+
+	s.Run()
 }
