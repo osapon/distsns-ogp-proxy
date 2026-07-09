@@ -79,7 +79,7 @@ func handler(writer http.ResponseWriter, serverRequest *http.Request) {
 		if err == nil {
 			// キャッシュを返す
 			log.Printf("cache %s\n", proxyUrl)
-			fmt.Fprintf(writer, string(proxyData.Value))
+			fmt.Fprint(writer, string(proxyData.Value))
 			return
 		}
 		if err == memcache.ErrCacheMiss {
