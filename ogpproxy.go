@@ -13,7 +13,6 @@ import (
 	"strings"
 	"os"
 	"golang.org/x/net/html"
-	"github.com/go-shiori/dom"
 	"github.com/bradfitz/gomemcache/memcache"
 	"crypto/md5"
 	service "github.com/kardianos/service"
@@ -125,8 +124,33 @@ func handler(writer http.ResponseWriter, serverRequest *http.Request) {
 	http.Redirect(writer, serverRequest, proxyUrl, 301)
 }
 
+func getElementsByTagName(doc *html.Node, tagName string) []*html.Node {
+	var result []*html.Node
+	var traverse func(*html.Node)
+	traverse = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == tagName {
+			result = append(result, n)
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			traverse(c)
+		}
+	}
+	traverse(doc)
+	return result
+}
+
+func setAttribute(n *html.Node, key, val string) {
+	for i := range n.Attr {
+		if n.Attr[i].Key == key {
+			n.Attr[i].Val = val
+			return
+		}
+	}
+	n.Attr = append(n.Attr, html.Attribute{Key: key, Val: val})
+}
+
 func replaceTagUrl(url *url.URL, doc *html.Node, tagName string) {
-	tags := dom.GetElementsByTagName(doc, tagName)
+	tags := getElementsByTagName(doc, tagName)
 	for _, node := range tags {
 		for _, a := range node.Attr {
 			if a.Key != "src" && a.Key != "href" {
@@ -141,7 +165,7 @@ func replaceTagUrl(url *url.URL, doc *html.Node, tagName string) {
 				} else {
 					attrUrl = url.Scheme + "://" + url.Host + "/" + a.Val
 				}
-				dom.SetAttribute(node, a.Key, attrUrl)
+				setAttribute(node, a.Key, attrUrl)
 				log.Printf("attr %s %s\n", a.Val, attrUrl)
 			}
 		}
